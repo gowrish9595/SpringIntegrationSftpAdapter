@@ -14,8 +14,12 @@ import org.springframework.integration.channel.DirectChannel;
 import org.springframework.integration.dsl.IntegrationFlow;
 import org.springframework.integration.dsl.Pollers;
 import org.springframework.integration.file.dsl.Files;
+import org.springframework.integration.file.filters.ChainFileListFilter;
+import org.springframework.integration.file.filters.FileSystemPersistentAcceptOnceFileListFilter;
+import org.springframework.integration.file.filters.SimplePatternFileListFilter;
 import org.springframework.integration.handler.advice.ErrorMessageSendingRecoverer;
 import org.springframework.integration.handler.advice.RequestHandlerRetryAdvice;
+import org.springframework.integration.metadata.ConcurrentMetadataStore;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessagingException;
 import org.springframework.core.retry.RetryPolicy;
@@ -37,14 +41,19 @@ public class IntegrationConfig {
                                            SignalFileResolver resolver,
                                            SftpPairUploader uploader,
                                            LocalFileMover mover,
+                                           ConcurrentMetadataStore metadataStore,
                                            @Qualifier(UPLOAD_ERROR_CHANNEL) MessageChannel uploadErrorChannel) {
         ensureLocalDirectoriesExist(properties);
-        String pattern = "*" + properties.local().signalExtension();
+
+        var filterChain = new ChainFileListFilter<File>();
+        filterChain.addFilter(new SimplePatternFileListFilter("*" + properties.local().signalExtension()));
+        filterChain.addFilter(new FileSystemPersistentAcceptOnceFileListFilter(
+                metadataStore, properties.metadataStore().inboxKeyPrefix()));
 
         return IntegrationFlow.from(
                         Files.inboundAdapter(properties.local().inbox().toFile())
-                                .patternFilter(pattern)
-                                .preventDuplicates(true),
+                                .filter(filterChain)
+                                .preventDuplicates(false),
                         e -> e.poller(Pollers.fixedDelay(properties.poller().fixedDelay())
                                 .maxMessagesPerPoll(properties.poller().maxMessagesPerPoll())))
                 .handle(File.class, (signal, headers) -> uploader.upload(resolver.resolve(signal)),

@@ -7,12 +7,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.integration.metadata.ConcurrentMetadataStore;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.oracle.OracleContainer;
 import org.testcontainers.utility.DockerImageName;
 
 import java.io.IOException;
@@ -38,8 +40,19 @@ class SftpAdapterIntegrationTest {
             .withCommand("sftpuser:sftppass:::upload")
             .waitingFor(Wait.forListeningPort());
 
+    @Container
+    static final OracleContainer ORACLE = new OracleContainer(
+            DockerImageName.parse("gvenzl/oracle-free:23-slim-faststart"))
+            .withUsername("sftp_adapter")
+            .withPassword("sftp_adapter")
+            .withStartupTimeout(Duration.ofMinutes(5));
+
     @DynamicPropertySource
     static void registerProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", ORACLE::getJdbcUrl);
+        registry.add("spring.datasource.username", ORACLE::getUsername);
+        registry.add("spring.datasource.password", ORACLE::getPassword);
+        registry.add("spring.datasource.driver-class-name", ORACLE::getDriverClassName);
         registry.add("sftp-adapter.local.inbox", () -> workDir.resolve("inbox").toString());
         registry.add("sftp-adapter.local.processed", () -> workDir.resolve("processed").toString());
         registry.add("sftp-adapter.local.error", () -> workDir.resolve("error").toString());
@@ -66,6 +79,9 @@ class SftpAdapterIntegrationTest {
 
     @Autowired
     private FileTransferProperties properties;
+
+    @Autowired
+    private ConcurrentMetadataStore metadataStore;
 
     @BeforeEach
     void prepareDirectories() throws IOException {
@@ -95,6 +111,12 @@ class SftpAdapterIntegrationTest {
             assertThat(remoteFileExists("/home/sftpuser/upload/signal/" + signalName)).isTrue();
             assertThat(containsBothFiles(properties.local().processed(), dataName, signalName)).isTrue();
         });
+
+        String dedupeKey = properties.metadataStore().inboxKeyPrefix()
+                + inbox.resolve(signalName).toAbsolutePath();
+        assertThat(metadataStore.get(dedupeKey))
+                .as("persistent dedupe entry for processed signal")
+                .isNotNull();
     }
 
     @Test

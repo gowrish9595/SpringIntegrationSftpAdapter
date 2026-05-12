@@ -15,8 +15,11 @@ public record FileTransferProperties(
         @NotNull Remote remote,
         @NotNull Sftp sftp,
         @NotNull Poller poller,
-        @NotNull Retry retry
+        @NotNull Retry retry,
+        @NotNull MetadataStore metadataStore
 ) {
+
+    public record MetadataStore(@NotBlank String region, @NotBlank String inboxKeyPrefix) {}
 
     public record Local(
             @NotNull Path inbox,
