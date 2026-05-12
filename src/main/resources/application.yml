@@ -1,0 +1,35 @@
+spring:
+  application:
+    name: spring-integration-sftp-adapter
+
+logging:
+  level:
+    com.example.sftpadapter: INFO
+    org.springframework.integration: INFO
+
+sftp-adapter:
+  local:
+    inbox: ${SFTP_ADAPTER_INBOX:./data/inbox}
+    processed: ${SFTP_ADAPTER_PROCESSED:./data/processed}
+    error: ${SFTP_ADAPTER_ERROR:./data/error}
+    signal-extension: .signal
+  remote:
+    data-directory: /upload/data
+    signal-directory: /upload/signal
+    temporary-file-suffix: .writing
+  sftp:
+    host: ${SFTP_HOST:localhost}
+    port: ${SFTP_PORT:22}
+    username: ${SFTP_USER:sftpuser}
+    password: ${SFTP_PASSWORD:}
+    private-key-location: ${SFTP_PRIVATE_KEY:}
+    private-key-passphrase: ${SFTP_PRIVATE_KEY_PASSPHRASE:}
+    allow-unknown-keys: true
+  poller:
+    fixed-delay: 5s
+    max-messages-per-poll: 5
+  retry:
+    max-attempts: 4
+    initial-interval: 2s
+    multiplier: 2.0
+    max-interval: 30s

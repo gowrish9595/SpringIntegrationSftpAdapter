@@ -1,0 +1,18 @@
+target/
+build/
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+.classpath
+.project
+.settings/
+.factorypath
+.flattened-pom.xml
+.DS_Store
+
+# Runtime data directories
+data/
+logs/
+*.log
